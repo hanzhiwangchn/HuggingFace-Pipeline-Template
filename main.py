@@ -127,7 +127,6 @@ def main():
         m.begin_run(train_loader, val_loader, test_loader)
 
         # train and evaluate
-        model.to(device)
         train_val_test_pt(args=args, train_loader=train_loader, val_loader=val_loader, test_loader=test_loader, 
             model=model, device=device, optimizer=optimizer, lr_scheduler=lr_scheduler, m=m, 
             label2id=label2id, id2label=id2label)

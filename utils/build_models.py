@@ -1,6 +1,6 @@
 from transformers import ResNetForImageClassification, ResNetModel, ResNetConfig, \
     AutoModelForImageClassification, ViTForImageClassification
-from peft import LoraConfig, get_peft_model
+from peft import LoraConfig, get_peft_model, PeftModel
 
 import torch.nn as nn
 import logging, json
@@ -151,8 +151,9 @@ def build_image_classification_model(args, label2id, id2label):
                 logger.info('load LoRA peft model')
                 temp_model = AutoModelForImageClassification.from_pretrained(args.model_checkpoint,
                         label2id=label2id, id2label=id2label, ignore_mismatched_sizes=True)
-                model = build_peft_model(temp_model, peft=args.peft_config) 
-                model = model.from_pretrained(temp_model, model_id=best_weights_path)
+                model = PeftModel.from_pretrained(temp_model, model_id=best_weights_path)
+                # model = build_peft_model(temp_model, peft=args.peft_config) 
+                # model = model.from_pretrained(temp_model, model_id=best_weights_path)
         else:
             model = AutoModelForImageClassification.from_pretrained(best_weights_path)
 

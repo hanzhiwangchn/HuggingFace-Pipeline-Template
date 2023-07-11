@@ -56,10 +56,10 @@ def train_val_test_pt(args, train_loader, val_loader, test_loader, model, device
         best_loss = 100
 
         # train and evaluate
-        for epoch in range(args.num_train_epochs):
+        for i in range(args.num_train_epochs):
             m.begin_epoch()
             train(model, train_loader, optimizer, lr_scheduler, device, progress_bar, m)
-            validation(model, val_loader, epoch, device, m)
+            validation(model, val_loader, device, m)
             m.end_epoch()
             m.display_epoch_results()
 
