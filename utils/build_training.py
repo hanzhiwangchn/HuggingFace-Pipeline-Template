@@ -1,10 +1,10 @@
-import numpy as np
-import evaluate
 import logging
+import numpy as np
+
 from transformers import Trainer, TrainingArguments, EarlyStoppingCallback
+import evaluate
 
 from utils.utils import collate_fn
-
 
 logger = logging.getLogger(__name__)
 
@@ -33,18 +33,17 @@ def compute_metrics(eval_pred):
 
 
 def build_train_argument(args):
-    model_name = args.model_checkpoint.split("/")[-1]
-
+    """Arguments for HuggingFace Trainer"""
     train_args = TrainingArguments(
-        output_dir=args.out_dir + f'/{model_name}',
-        logging_dir=args.log_dir + f'/{model_name}',
+        output_dir=f'{args.out_dir}/{args.model_name_trainer}',
+        logging_dir=f'{args.log_dir}/{args.model_name_trainer}',
         remove_unused_columns=False,
         evaluation_strategy="epoch",
         logging_strategy='epoch',
         save_strategy="epoch",
         learning_rate=args.lr,
         per_device_train_batch_size=args.batch_size,
-        gradient_accumulation_steps=4,
+        gradient_accumulation_steps=args.gradient_accumulation_steps,
         per_device_eval_batch_size=args.batch_size,
         fp16=args.cuda,
         num_train_epochs=args.num_train_epochs,
@@ -63,6 +62,7 @@ def build_trainer(model, train_args, dataset_train, dataset_val, image_processor
                       callbacks=[EarlyStoppingCallback(early_stopping_patience=3)],
                       tokenizer=image_processor, compute_metrics=compute_metrics)
     return trainer
+
 
 def train_val_test(trainer, dataset_test, args):
     """
@@ -94,9 +94,12 @@ def train_val_test(trainer, dataset_test, args):
         logger.info('--- Evaluation ended ---')
 
     logger.info('--- Testing started ---')
+    # At Training time, since we set load_best_model_at_end=True in Trainer arguments, 
+    # the optimal Trainer will be loaded automatically for testing. 
+    # On the contrary, we need to load the best model manually in a Pytorch loop workflow.
+
     # trainer.predict() returns logits (num_instance, num_class); 
     # target label (num_instance) and corresponding metrics
-    # Since we load the best model using "load_best_model_at_end=True", best trainer has been loaded.
     prediction = trainer.predict(dataset_test)
 
     trainer.log_metrics("test", prediction[2])

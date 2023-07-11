@@ -11,14 +11,14 @@ logger = logging.getLogger(__name__)
 
 # Apply AutoImageProcessor to preprocess images.
 # It should be noted that HF dataset built from ImageFolder method stores images as PIL object. 
-# If the dataset is built from a PT dataset, the images would be in np.array format.
+# If the dataset is built from a PT dataset, the images would be in array format.
 
 
 def preprocess_datasets(dataset_train, dataset_val, dataset_test, args):
-    """Whole function to preprocess the dataset"""
+    """Main function to preprocess the dataset"""
     # initialize transformation for train/val/test set
     config.train_transforms, config.val_transforms, config.test_transforms, image_processor = preprocess(args)
-    # transform the dataets
+    # transform the dataset
     if args.dataset_build_method == 'imagefolder':
         dataset_train.set_transform(preprocess_train)
         dataset_val.set_transform(preprocess_val)
@@ -66,9 +66,9 @@ def preprocess_train_pt(example_batch):
     Note that set_transform will replace the format defined by set_format and
         will be applied on-the-fly (when it is called).
     In build_dataset.py, we use set_format method to set both image and label to torch.tensor, while
-    it will be rewrited when we call the set_transform method.
+    it will be rewritten when we call the set_transform method.
     """
-    # transform data type to PIL image for later convinence
+    # transform data type to PIL image for later convenience
     example_batch["pixel_values"] = [config.train_transforms(Image.fromarray(np.uint8(np.array(image)))) for image in example_batch["image"]]
     return example_batch
 

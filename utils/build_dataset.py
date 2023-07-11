@@ -1,9 +1,10 @@
 from sklearn.model_selection import train_test_split
 from datasets import Dataset, load_dataset
-from utils.utils import TrainDataset, ValidationDataset, TestDataset
 
 import numpy as np
 import os, glob, cv2
+
+from utils.utils import TrainDataset, ValidationDataset, TestDataset
 
 # Task: Given a folder with images, load images as an HF dataset
 # Solution: 1. Use HF ImageFolder method.
@@ -13,7 +14,9 @@ import os, glob, cv2
 
 
 def build_datasets(args):
-    """Whole function for building the dataet"""
+    """
+    Main function for dataset building. Two methods are provided: 'imagefolder' and 'PT2HF'. 
+    """
     if args.dataset_build_method == 'imagefolder':
         dataset_train, dataset_val, dataset_test = build_dataset_from_image_folder(args=args)
         label2id, id2label = build_id_label_mapping(dataset=dataset_train)
@@ -25,16 +28,16 @@ def build_datasets(args):
 
 
 def build_dataset_from_image_folder(args):
-    """HF dataset could be built from a folder with specific structures"""
+    """HF dataset could be built from a folder with a specific structure"""
     dataset = load_dataset("imagefolder", data_dir=f"{args.dataset_dir}")['train']
-    # Split into train/val/test set (90/5/5)
+    # Split into train/val/test set
     train_valtest = dataset.train_test_split(test_size=args.val_test_size, stratify_by_column="label")
-    test_valid = train_valtest['test'].train_test_split(test_size=args.test_size, stratify_by_column="label")
+    val_test = train_valtest['test'].train_test_split(test_size=args.test_size, stratify_by_column="label")
 
     # Define train/val/test sets
     dataset_train = train_valtest['train']
-    dataset_val = test_valid['train']
-    dataset_test = test_valid['test']
+    dataset_val = val_test['train']
+    dataset_test = val_test['test']
 
     return dataset_train, dataset_val, dataset_test
 

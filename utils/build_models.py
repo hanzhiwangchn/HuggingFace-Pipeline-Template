@@ -1,10 +1,9 @@
-from transformers import ResNetForImageClassification, ResNetModel, \
-    AutoModelForImageClassification, ViTForImageClassification, ResNetConfig, ViTModel
+from transformers import ResNetForImageClassification, ResNetModel, ResNetConfig, \
+    AutoModelForImageClassification, ViTForImageClassification
 from peft import LoraConfig, get_peft_model
 
 import torch.nn as nn
-import logging
-import json, os
+import logging, json
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +72,7 @@ def build_resnet(options):
         # pretrained models will have a specific structure
         resnet_model = ResNetModel.from_pretrained('microsoft/resnet-50')
     elif options == 'pretrained_with_head':
+        # pretrained models with a classification head
         resnet_model = ResNetForImageClassification.from_pretrained('microsoft/resnet-50')
 
     return resnet_model
@@ -91,54 +91,11 @@ def print_trainable_parameters(model):
                 f"trainable%: {100 * trainable_params / all_param:.2f}")
 
 
-def build_id_label_mapping(dataset):
-    labels = dataset.features["label"].names
-    label2id, id2label = dict(), dict()
-    for i, label in enumerate(labels):
-        label2id[label] = i
-        id2label[i] = label
-
-    return label2id, id2label
-
-
-def build_image_classification_model(args, label2id, id2label):
-    """Model used in main.py"""
-    if not args.test:
-        # Load pretrained model from HF
-        model = AutoModelForImageClassification.from_pretrained(args.model_checkpoint,
-            label2id=label2id, id2label=id2label, ignore_mismatched_sizes=True)
-        print_trainable_parameters(model)
-    else:
-        # Load fine-tuned model from local dir for testing.
-        # When we use trainer, the model weights are saved in checkpoints, 
-        # which can be found at args.best_model_ckpt_dir.
-        # When we do not use trainer, the model weights are saved in 
-        if args.use_trainer:
-            with open(args.best_model_ckpt_dir) as f:
-                data = json.load(f)
-            if args.peft:
-                if args.peft_config == 'lora':
-                    temp_model = AutoModelForImageClassification.from_pretrained(args.model_checkpoint,
-                        label2id=label2id, id2label=id2label, ignore_mismatched_sizes=True)
-                    model = build_peft_model(temp_model, peft='lora')
-                    model = model.from_pretrained(temp_model, model_id=data['best_model_checkpoint'])
-            else:
-                model = AutoModelForImageClassification.from_pretrained(data['best_model_checkpoint'])
-        else:
-            if args.peft:
-                if args.peft_config == 'lora':
-                    temp_model = AutoModelForImageClassification.from_pretrained(args.model_checkpoint,
-                        label2id=label2id, id2label=id2label, ignore_mismatched_sizes=True)
-                    model = build_peft_model(temp_model, peft='lora')
-                    model = model.from_pretrained(temp_model, model_id=args.out_dir_no_trainer)
-            else:
-                model = AutoModelForImageClassification.from_pretrained(args.out_dir_no_trainer)
-
-    return model
-
-
 def build_peft_model(model, peft='lora'):
-    """PEFT Model used in main.py"""
+    """
+    Transform a model to a PEFT model. 
+    https://huggingface.co/docs/peft/package_reference/peft_model
+    """
     if peft == 'lora':
         config = LoraConfig(r=16, lora_alpha=16, target_modules=["query", "value"],
                             lora_dropout=0.1, bias="none", modules_to_save=["classifier"])
@@ -146,17 +103,57 @@ def build_peft_model(model, peft='lora'):
 
     return peft_model
 
+
+# ------------------- Main Models for pipeline---------------------
 def build_model(args, label2id, id2label):
-    """Whole function to build the model"""
+    """Main function for model building"""
+    # Training phase
     if not args.test:
         model = build_image_classification_model(args=args, label2id=label2id, id2label=id2label)
     
         if args.peft:
             if args.peft_config == 'lora':
                 logger.info('Apply LoRA to perform peft')
-                model = build_peft_model(model=model, peft='lora')
+                model = build_peft_model(model=model, peft=args.peft_config)
                 print_trainable_parameters(model)
+    # Testing phase
     else:
         model = build_image_classification_model(args=args, label2id=label2id, id2label=id2label)
     
+    return model
+
+
+def build_image_classification_model(args, label2id, id2label):
+    """Model used in main.py"""
+    # In training phase, we load pretrained model from HF
+    if not args.test:
+        model = AutoModelForImageClassification.from_pretrained(args.model_checkpoint,
+            label2id=label2id, id2label=id2label, ignore_mismatched_sizes=True)
+        print_trainable_parameters(model)
+    
+    # In testing, we load model weights from local dir
+    else:
+        # If args.use_trainer is True, the model weights are saved in checkpoints, 
+        # which can be found at args.best_ckpt_dir_trainer.
+        # If args.use_trainer is False, the model weights are saved in arg.out_dir_no_trainer, 
+        # which are saved using save_pretrained() and could be loaded using from_pretrained()
+        if args.use_trainer:
+            with open(args.best_ckpt_dir_trainer) as f:
+                data = json.load(f)
+            best_weights_path = data['best_model_checkpoint']
+        else:
+            best_weights_path = args.out_dir_no_trainer
+
+        # whether we use PEFT in the training phase
+        # model_id: A path to a directory containing a Lora configuration file saved using the save_pretrained().
+        if args.peft:
+            if args.peft_config == 'lora':
+                logger.info('load LoRA peft model')
+                temp_model = AutoModelForImageClassification.from_pretrained(args.model_checkpoint,
+                        label2id=label2id, id2label=id2label, ignore_mismatched_sizes=True)
+                model = build_peft_model(temp_model, peft=args.peft_config) 
+                model = model.from_pretrained(temp_model, model_id=best_weights_path)
+        else:
+            model = AutoModelForImageClassification.from_pretrained(best_weights_path)
+
     return model

@@ -10,14 +10,24 @@ results_folder = 'model_ckpt_results'
 # ------------------- update arguments ---------------------
 
 def update_args(args):
+    """update arguments"""
     args.out_dir = results_folder
     args.log_dir = results_folder + '/log'
 
-    args.model_name = args.model_checkpoint.split("/")[-1]
-    args.best_model_ckpt_dir = os.path.join(args.out_dir, args.model_name, 'trainer_state.json')
-    # used in "no_trainer"
-    args.model_config = args.model_checkpoint.split("/")[-1] + '-pt'
-    args.out_dir_no_trainer = f'{args.out_dir}/{args.model_config}'
+    args.model_name_trainer = args.model_checkpoint.split("/")[-1] + f'-{args.comment}' 
+    args.model_name_no_trainer = args.model_checkpoint.split("/")[-1] + f'-pt-{args.comment}' 
+
+    # Trainer: checkpoint dir with best val performance
+    args.best_ckpt_dir_trainer = os.path.join(args.out_dir, args.model_name, 'trainer_state.json')
+    # No Trainer
+    args.out_dir_no_trainer = f'{args.out_dir}/{args.model_name_no_trainer}'
+
+    # shorten running time for code tests
+    if args.run_code_test:
+        args.val_test_size = 0.5
+        args.test_size = 0.5
+        args.num_train_epochs = 2
+        args.gradient_accumulation_steps = 4
     return args
 
 # ------------------- Pytorch Dataset ---------------------
