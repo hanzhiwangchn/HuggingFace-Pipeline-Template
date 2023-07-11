@@ -145,15 +145,12 @@ def build_image_classification_model(args, label2id, id2label):
             best_weights_path = args.out_dir_no_trainer
 
         # whether we use PEFT in the training phase
-        # model_id: A path to a directory containing a Lora configuration file saved using the save_pretrained().
         if args.peft:
             if args.peft_config == 'lora':
                 logger.info('load LoRA peft model')
-                temp_model = AutoModelForImageClassification.from_pretrained(args.model_checkpoint,
+                model = AutoModelForImageClassification.from_pretrained(args.model_checkpoint,
                         label2id=label2id, id2label=id2label, ignore_mismatched_sizes=True)
-                model = PeftModel.from_pretrained(temp_model, model_id=best_weights_path)
-                # model = build_peft_model(temp_model, peft=args.peft_config) 
-                # model = model.from_pretrained(temp_model, model_id=best_weights_path)
+                model = PeftModel.from_pretrained(model, model_id=best_weights_path)
         else:
             model = AutoModelForImageClassification.from_pretrained(best_weights_path)
 
